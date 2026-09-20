@@ -1,0 +1,106 @@
+#! armclang -E --target=arm-arm-none-eabi -x c -mcpu=cortex-m33
+; The first line specifies a preprocessor command that the linker invokes
+; to pass a scatter file through a C preprocessor.
+
+;*******************************************************************************
+;* \file ppca_linker_ns_ram.sct
+;* \version 1.000
+;*
+;* Linker file for the ARMCC.
+;*
+;* The main purpose of the linker script is to describe how the sections in the
+;* input files should be mapped into the output file, and to control the memory
+;* layout of the output file.
+;*
+;* \note The entry point location is fixed and starts at 0x12000000. The valid
+;* application image should be placed there.
+;*
+;* \note The linker files included with the PDL template projects must be generic
+;* and handle all common use cases. Your project may not use every section
+;* defined in the linker files. In that case you may see warnings during the
+;* build process. In your project, you can simply comment out or remove the
+;* relevant code in the linker file.
+;*******************************************************************************
+;* \copyright
+;* Copyright (c) (2024), Cypress Semiconductor Corporation (an Infineon company) or
+;* an affiliate of Cypress Semiconductor Corporation.
+;* SPDX-License-Identifier: Apache-2.0
+;*
+;* Licensed under the Apache License, Version 2.0 (the "License");
+;* you may not use this file except in compliance with the License.
+;* You may obtain a copy of the License at
+;*
+;*     http://www.apache.org/licenses/LICENSE-2.0
+;*
+;* Unless required by applicable law or agreed to in writing, software
+;* distributed under the License is distributed on an "AS IS" BASIS,
+;* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;* See the License for the specific language governing permissions and
+;* limitations under the License.
+;******************************************************************************/
+
+; The defines below describe the location and size of blocks of memory in the target.
+; Use these defines to specify the memory regions available for allocation.
+
+; The following defines control RAM memory allocation for the CM33 core.
+; RAM
+#define PPCA_SRAM_CODE_NS_START              0x00000000
+; 80K - M0 (32KB) + M2 (32KB) + M3 (16KB) code memory size 
+#define PPCA_SRAM_CODE_SIZE                  0x00014000
+
+#define PPCA_SRAM_DATA_NS_START              0x20000000
+; 16K - M1/M3 Data memory size 
+#define PPCA_SRAM_DATA_SIZE                  0x00004000
+
+#define PPCA_SRAM_SHM_NS_START               0x20040000
+; 16K - M4 shared memory size
+#define PPCA_SRAM_SHM_SIZE                   0x00004000
+
+; The size of the stack section at the end of CM33 SRAM 
+#define RAMVECTORS_ALIGNMENT        512
+;  2K for stack
+#define STACK_SIZE  0x800
+
+; Define the sections
+LR_SRAM_CODE PPCA_SRAM_CODE_NS_START PPCA_SRAM_CODE_SIZE
+{
+
+    app_code_main (PPCA_SRAM_CODE_NS_START)
+    {
+        * (RESET, +FIRST)
+        * (.bss.noinit.RESET_RAM, +FIRST)
+        *(InRoot$$Sections)
+        .ANY (+RO)
+        .ANY (+XO)
+        *(+RW, +ZI)
+        *(.text)
+        *(.bss)
+    }
+
+}
+LR_SRAM_DATA PPCA_SRAM_DATA_NS_START PPCA_SRAM_DATA_SIZE
+{
+    RW_IRAM1 +0 UNINIT
+    {
+        *(.bss.noinit)
+    }
+
+    ARM_LIB_HEAP  +0 EMPTY ((PPCA_SRAM_DATA_NS_START+PPCA_SRAM_DATA_SIZE)-AlignExpr(ImageLimit(RW_IRAM1), 8)-STACK_SIZE)
+    {
+    }
+
+    ARM_LIB_STACK (PPCA_SRAM_DATA_NS_START+PPCA_SRAM_DATA_SIZE) EMPTY -STACK_SIZE
+    {
+    }
+
+}
+LR_SRAM_SHARED PPCA_SRAM_SHM_NS_START PPCA_SRAM_SHM_SIZE
+{
+    .cy_sharedmem PPCA_SRAM_SHM_NS_START PPCA_SRAM_SHM_SIZE {
+      *(.cy_sharedmem)
+    }
+}
+
+
+
+/* [] END OF FILE */

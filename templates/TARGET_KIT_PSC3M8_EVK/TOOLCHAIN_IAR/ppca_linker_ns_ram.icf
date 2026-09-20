@@ -1,0 +1,105 @@
+/*******************************************************************************
+* \file ppca_linker_ns_ram.icf
+* \version 1.000
+*
+* Linker file for the IAR compiler.
+*
+* The main purpose of the linker script is to describe how the sections in the
+* input files should be mapped into the output file, and to control the memory
+* layout of the output file.
+*
+* \note This linker script supports 80KB PPCA Core0 application execution
+* across memory regions M0 (32KB), M2 (32KB), and M3 (16KB).
+* The memory remap feature enables contiguous execution mapping.
+*
+* Memory Layout:
+*   - M0 (Code): 0x00000000 - 0x00007FFF (32KB)
+*   - M2 (Code): 0x00008000 - 0x0000FFFF (32KB)
+*   - M3 (Code): 0x00010000 - 0x00013FFF (16KB)
+*   - M1 (Data): 0x20000000 - 0x20003FFF (16KB, shared memory)
+*   - M4 (Data): 0x20040000 - 0x20043FFF (16KB, shared memory)
+*
+* \note The entry point is fixed and starts at 0x02010000. The valid application
+* image should be placed there.
+*
+* \note The linker files included with the PDL template projects must be generic
+* and handle all common use cases. Your project may not use every section
+* defined in the linker files. In that case you may see warnings during the
+* build process. In your project, you can simply comment out or remove the
+* relevant code in the linker file.
+*
+********************************************************************************
+* \copyright
+* Copyright (c) (2020-2024), Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.
+* SPDX-License-Identifier: Apache-2.0
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
+
+/*###ICF### Section handled by ICF editor, don't touch! ****/
+/*-Editor annotation file-*/
+/* IcfEditorFile="$TOOLKIT_DIR$\config\ide\IcfEditor\cortex_v1_4.xml" */
+/*-Specials-*/
+
+define symbol __ICFEDIT_region_RAM_CODE_start__   = 0x00000000;
+define symbol __ICFEDIT_region_RAM_CODE_size__    = 0x00014000; /* 80K - increased for larger code across M0, M2, M3 regions */
+define symbol __ICFEDIT_region_RAM_DATA_start__   = 0x20000000;
+define symbol __ICFEDIT_region_RAM_DATA_size__    = 0x00004000; /* 16K - M1/M3 Data memory size */
+define symbol __ICFEDIT_region_RAM_SHARED_start__ = 0x20040000;
+define symbol __ICFEDIT_region_RAM_SHARED_size__  = 0x00004000; /* 16K - M4 shared memory size */
+
+if (!isdefinedsymbol(__STACK_SIZE)) {
+  define symbol __ICFEDIT_size_cstack__ = 0x800;
+} else {
+  define symbol __ICFEDIT_size_cstack__ = __STACK_SIZE;
+}
+define symbol __ICFEDIT_size_proc_stack__ = 0x0;
+
+/* Defines the minimum heap size. The actual heap size will be expanded to the end of the stack region */
+if (!isdefinedsymbol(__HEAP_SIZE)) {
+    define symbol __ICFEDIT_size_heap__ = 0x0400;
+} else {
+  define symbol __ICFEDIT_size_heap__ = __HEAP_SIZE;
+}
+
+define memory mem with size = 4G;
+define region CODE_region = mem:[from __ICFEDIT_region_RAM_CODE_start__ size __ICFEDIT_region_RAM_CODE_size__];
+define region DATA_region = mem:[from __ICFEDIT_region_RAM_DATA_start__ size __ICFEDIT_region_RAM_DATA_size__];
+define region shared_mem_region =  mem:[from __ICFEDIT_region_RAM_SHARED_start__ size __ICFEDIT_region_RAM_SHARED_size__]; /* shared_ram0 */
+
+define block CSTACK     with alignment = 8, size = __ICFEDIT_size_cstack__     { };
+define block PROC_STACK with alignment = 8, size = __ICFEDIT_size_proc_stack__ { };
+define block HEAP       with expanding size, alignment = 8, minimum size = __ICFEDIT_size_heap__ { };
+define block HSTACK {block HEAP, block PROC_STACK, last block CSTACK};
+define block RO     {first section .intvec, readonly};
+
+/*-Initializations-*/
+initialize by copy { readwrite };
+do not initialize  { section .noinit, section .intvec_ram };
+
+/*-Placement-*/
+
+/* Flash - Cortex-M33 application */
+place at address (__ICFEDIT_region_RAM_CODE_start__) { block RO };
+
+/* RAM */
+place at start of DATA_region  { readwrite section .intvec_ram};
+place in          DATA_region  { readwrite };
+place at end   of DATA_region  { block HSTACK };
+
+place in          shared_mem_region { readwrite section .cy_sharedmem };
+
+keep {  section .intvec  };
+
+/* EOF */
